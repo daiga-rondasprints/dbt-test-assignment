@@ -221,7 +221,7 @@ def star_schema(fact: str, fact_lines: list[str], dims: dict[str, list[str]], ti
         fig.add_annotation(x=(x0 + x1) / 2, y=(y0 + y1) / 2 - 0.35, text="<br>".join(lines), showarrow=False,
                            font=dict(color=GREY_DARK, size=11), align="center")
 
-    box(3.4, 3.2, 6.6, 6.8, fact, fact_lines, True)
+    box(3.1, 3.2, 6.9, 6.8, fact, fact_lines, True)
     positions = [(0.3, 6.5, 3.0, 9.6), (7.0, 6.5, 9.7, 9.6), (0.3, 0.4, 3.0, 3.5), (7.0, 0.4, 9.7, 3.5)]
     for (name, lines), (x0, y0, x1, y1) in zip(dims.items(), positions):
         box(x0, y0, x1, y1, name, lines, False)

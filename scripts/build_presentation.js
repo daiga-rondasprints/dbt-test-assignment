@@ -202,7 +202,7 @@ function newSlide(eyebrow, title, subtitle = '') {
     addText(slide, r[2], 5.35, y, 6.6, 0.28, { fontSize: 10, color: C.gray });
   });
   addText(slide, 'mart_data_quality_triage is a rebuildable exception list, not a mutable ticket queue. No source line ID exists; a content hash is only a locator.', 0.84, 6.34, 11.7, 0.45, { fontSize: 10, color: C.gray });
-  addNote(slide, 'The 9,815 colliding IDs appear as 19,630 row-level exception records because both source versions are visible. Missing product and store keys also include 99901 placeholder values, so counts exceed the raw null counts. The data contract asks upstream for a real line key and explicit unknown semantics.');
+  addNote(slide, 'Each of the 9,815 colliding IDs contributes exactly one triage row: the older version. The latest ingested_at version is in the fact, per Sales Ops. Missing product and store keys also include 99901 placeholder values, so counts exceed the raw null counts. The data contract asks upstream for a real line key and explicit unknown semantics.');
 }
 
 {
@@ -328,14 +328,14 @@ function newSlide(eyebrow, title, subtitle = '') {
     slide.addShape(pptx.ShapeType.line, { x: b.x + b.w + 0.08, y: 2.63, w: blocks[i + 1].x - b.x - b.w - 0.16, h: 0, line: { color: C.darkLime, width: 1.8, endArrowType: 'triangle' } });
   });
   slide.addShape(pptx.ShapeType.roundRect, { x: 3.8, y: 3.82, w: 4.1, h: 1.0, rectRadius: 0.07, fill: { color: C.paleRed }, line: { color: C.paleRed, transparency: 100 } });
-  addText(slide, `${d.duplicate_candidate_rows_in_triage.toLocaleString()} duplicate-version rows`, 4.0, 3.98, 3.75, 0.28, { fontSize: 15, bold: true, color: C.red });
-  addText(slide, `${d.deduplicated_transaction_ids.toLocaleString()} IDs x 2 versions; both versions are logged in triage.`, 4.0, 4.37, 3.7, 0.25, { fontSize: 9, color: C.gray });
+  addText(slide, `${d.duplicate_candidate_rows_in_triage.toLocaleString()} older versions moved to triage`, 4.0, 3.98, 3.75, 0.28, { fontSize: 15, bold: true, color: C.red });
+  addText(slide, `${d.deduplicated_transaction_ids.toLocaleString()} IDs x 2 versions; latest ingested_at kept, older sent to triage.`, 4.0, 4.37, 3.7, 0.25, { fontSize: 9, color: C.gray });
   slide.addShape(pptx.ShapeType.roundRect, { x: 8.35, y: 3.82, w: 4.08, h: 1.0, rectRadius: 0.07, fill: { color: 'E7EDF4' }, line: { color: 'E7EDF4', transparency: 100 } });
   addText(slide, `${d.excluded_duplicate_versions.toLocaleString()} versions excluded`, 8.56, 3.98, 3.7, 0.28, { fontSize: 15, bold: true, color: C.navy });
   addText(slide, `Latest version retained; older rows remain queryable in the audit.`, 8.56, 4.37, 3.7, 0.25, { fontSize: 9, color: C.gray });
   addText(slide, `${d.all_triage_issue_rows.toLocaleString()} total issue rows / ${d.distinct_source_rows_flagged.toLocaleString()} distinct source rows flagged (categories overlap).`, 0.95, 5.28, 11.4, 0.32, { fontSize: 12, bold: true });
   addText(slide, 'Unknown keys, missing costs, negative quantities and attribute conflicts are retained/flagged, not dropped. Only 9,815 displaced ID versions are excluded from the fact.', 0.95, 5.78, 11.4, 0.55, { fontSize: 10, color: C.gray, valign: 'top' });
-  addNote(slide, 'The CSV has 509,480 rows and 499,665 distinct transaction IDs, leaving 9,815 excess versions. The version audit keeps all 509,480 rows; one latest version per ID feeds the 499,665-row fact and 9,815 older versions are explicitly marked for triage. The duplicate issue category contains both versions for each collided ID (19,630 rows). Other issue categories overlap, so their counts must not be summed as distinct dropped records.');
+  addNote(slide, 'The CSV has 509,480 rows and 499,665 distinct transaction IDs, leaving 9,815 excess versions. The version audit keeps all 509,480 rows; one latest version per ID feeds the 499,665-row fact and 9,815 older versions are explicitly marked for triage. The duplicate issue category holds the 9,815 older versions only; the selected versions are in the fact. Other issue categories overlap, so their counts must not be summed as distinct dropped records.');
 }
 
 {

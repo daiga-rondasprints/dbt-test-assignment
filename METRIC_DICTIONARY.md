@@ -29,7 +29,7 @@ company scorecard.
 | View / accountable team | Primary KPIs | Guardrail against one-sided interpretation |
 |---|---|---|
 | **CEO / Management** | Net sales, gross profit, gross margin, YoY change, cost basis sensitivity, gross profit less direct store cost scenario | Optimize sustainable total-company gross profit; do not claim net income without full opex/tax. |
-| **Finance** | Standard and landed gross profit/margin side-by-side, standard-cost coverage, signed COGS, YoY gross-profit change, direct-store-cost annual and monthly scenarios | Resolve cost grain and $44k-ish annual/monthly ambiguity; costless sales stay visible. |
+| **Finance** | Standard and landed gross profit/margin side-by-side, standard-cost coverage, signed COGS, YoY gross-profit change, direct-store-cost annual and monthly scenarios | Store opex is read as annual (decision, see SPEC.md); the monthly x12 reading is a sensitivity only. Costless sales stay visible. |
 | **Merchandising / Buying** | Category/product sales and growth, gross profit and margin, selling quantity, provisional pack equivalents and price per equivalent (only if quantity grain is confirmed), returns | High revenue with poor margin is not a win; label pack-size interpretation and promotion/cost basis. |
 | **Store Operations** | Store/region sales, cost and gross profit per sqft, store area coverage, returns, YoY | Compare only like-for-like positive areas; exclude store 200's zero sqft from area ratios, not from sales. |
 | **Sales Operations** | Sales per event, sales/quantity, return-adjustment line rate, transaction-ID collision rate | Event key is not line ID; do not count source versions as extra sales. |

@@ -60,6 +60,7 @@ def row_flow() -> dict:
         "dim_product_known": scalar(f"select count(*) from {DIM_PRODUCT} where not is_unknown"),
         "dim_store": scalar(f"select count(*) from {DIM_STORE}"),
         "dim_store_known": scalar(f"select count(*) from {DIM_STORE} where not is_unknown"),
+        "store_names": scalar(f"select count(distinct store_name) from {DIM_STORE} where not is_unknown"),
         "dim_date": scalar(f"select count(*) from {DIM_DATE}"),
         "date_min": scalar(f"select min(date_day) from {DIM_DATE}"),
         "date_max": scalar(f"select max(date_day) from {DIM_DATE}"),
@@ -77,7 +78,8 @@ def triage_counts() -> pd.DataFrame:
 
 def product_name_conflict() -> pd.DataFrame:
     return query(f"""
-        select product_id, product_name_catalog, product_effective_from, product_effective_to,
+        select product_id, product_name_catalog, cast(product_effective_from as date) as product_effective_from,
+               cast(product_effective_to as date) as product_effective_to,
                min(transaction_date) as first_seen, max(transaction_date) as last_seen, count(*) as rows
         from {STG} where product_id = 19 group by 1, 2, 3, 4 order by 2
     """)

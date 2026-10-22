@@ -6,15 +6,6 @@ with source_rows as (
 
 ),
 
-duplicate_ids as (
-
-    select transaction_id
-    from source_rows
-    group by transaction_id
-    having count(*) > 1
-
-),
-
 source_row_issues as (
 
     select
@@ -29,13 +20,9 @@ source_row_issues as (
         'source_row' as issue_scope,
         'DUPLICATE_TRANSACTION_ID' as issue_code,
         'review' as severity,
-        case
-            when version_disposition = 'selected_for_fact'
-                then 'Selected version; other source versions for this ID are retained in triage.'
-            else 'Duplicate source version excluded from the fact; latest ingested version is selected.'
-        end as issue_details
+        'Older source version of a colliding transaction ID, moved to triage; the latest ingested_at version is in the fact.' as issue_details
     from source_rows
-    where transaction_id in (select transaction_id from duplicate_ids)
+    where version_disposition = 'triage_duplicate_version'
 
     union all
 

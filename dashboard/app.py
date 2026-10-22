@@ -90,36 +90,86 @@ scope_note = f"{year}; regions: {', '.join(sel_regions) if len(sel_regions) < le
              f"categories: {', '.join(sel_categories) if len(sel_categories) < len(categories) else 'all'}"
 
 st.markdown("## Retail performance: what the data is, how it flows, and what is working")
-st.caption("Each section asks your question and answers it in a sentence and one chart. All figures come from the built dbt marts.")
+st.caption("One question, one answer, one chart per section. Every figure is read from the built dbt marts.")
 
 y = annual.set_index("year")
 cur, prev = y.loc[year], (y.loc[year - 1] if year - 1 in y.index else None)
-t = st.columns(5)
-t[0].markdown(swd.tile("Net sales", usd(cur["net_sales"], 1), f"{usd(cur['net_sales_yoy_change'], 2)} / {pct(cur['net_sales_yoy_pct'])} YoY" if prev is not None else None,
-                       cur["net_sales_yoy_change"] >= 0 if prev is not None else None), unsafe_allow_html=True)
-t[1].markdown(swd.tile("Gross profit", usd(cur["gross_profit"], 1), f"{usd(cur['gross_profit_yoy_change'], 2)} / {pct(cur['gross_profit_yoy_pct'])} YoY" if prev is not None else None,
+sy_all = store_year[(store_year["year"] == year)]
+opex_annual = sy_all["direct_store_operating_costs"].sum()
+gp_known = sy_all["gross_profit"].sum()
+covered_annual = int((sy_all["direct_store_operating_costs"] <= sy_all["gross_profit"]).sum())
+covered_monthly = int((sy_all["direct_store_operating_costs"] * 12 <= sy_all["gross_profit"]).sum())
+landed_margin = cur["landed_gross_profit"] / cur["net_sales"]
+yoy = lambda col: f"{usd(cur[col] - prev[col], 2)} / {pct(cur[col] / prev[col] - 1)} YoY" if prev is not None else ""  # noqa: E731
+
+st.markdown(f"<div style='font-size:12px;color:{swd.GREY_DARK};margin-bottom:4px'>Headline {year}, one tile per stakeholder note. "
+            f"Net sales {usd(cur['net_sales'], 2)} ({yoy('net_sales')}); average selling price ${cur['average_selling_price']:.2f}"
+            + (f" ({cur['average_selling_price'] - prev['average_selling_price']:+.2f} / {pct(cur['average_selling_price'] / prev['average_selling_price'] - 1)} YoY)." if prev is not None else ".")
+            + "</div>", unsafe_allow_html=True)
+t = st.columns(4)
+t[0].markdown(swd.tile("Finance planning · margin on standard_unit_cost", pct(cur["gross_margin_pct"]),
+                       f"Gross profit {usd(cur['gross_profit'], 2)} ({yoy('gross_profit')})<br>margin {pp(cur['gross_margin_pct'] - prev['gross_margin_pct']) if prev is not None else ''} YoY · pack-adjusted",
                        cur["gross_profit_yoy_change"] >= 0 if prev is not None else None), unsafe_allow_html=True)
-t[2].markdown(swd.tile("Gross margin", pct(cur["gross_margin_pct"], 2), pp(cur["gross_margin_pct"] - prev["gross_margin_pct"]) + " YoY" if prev is not None else None,
-                       (cur["gross_margin_pct"] >= prev["gross_margin_pct"]) if prev is not None else None), unsafe_allow_html=True)
-t[3].markdown(swd.tile("Average selling price", f"${cur['average_selling_price']:.2f}",
-                       f"{cur['average_selling_price'] - prev['average_selling_price']:+.2f} / {pct(cur['average_selling_price'] / prev['average_selling_price'] - 1)} YoY" if prev is not None else None,
-                       (cur["average_selling_price"] >= prev["average_selling_price"]) if prev is not None else None), unsafe_allow_html=True)
-t[4].markdown(swd.tile("Events in fact", f"{int(cur['transaction_count']):,}", f"{int(cur['return_or_adjustment_count']):,} negative-quantity lines"), unsafe_allow_html=True)
+t[1].markdown(swd.tile("AP / Ops · margin on landed_unit_cost", pct(landed_margin),
+                       f"Landed gross profit {usd(cur['landed_gross_profit'], 2)} ({yoy('landed_gross_profit')})<br>"
+                       f"{(cur['gross_margin_pct'] - landed_margin) * 100:.1f} pp below the Finance view; shown as a sensitivity",
+                       (cur["landed_gross_profit"] >= prev["landed_gross_profit"]) if prev is not None else None), unsafe_allow_html=True)
+t[2].markdown(swd.tile("Sales ops · latest ingested_at wins", f"{flow['fact_rows']:,} events",
+                       f"{flow['colliding_ids']:,} colliding IDs: newest version kept, {flow['excluded_versions']:,} older moved to triage<br>"
+                       f"Net sales {usd(cur['net_sales'], 2)} ({yoy('net_sales')})", True), unsafe_allow_html=True)
+t[3].markdown(swd.tile("FP&A vs Store Finance · opex read as ANNUAL", usd(gp_known - opex_annual, 2),
+                       f"Gross profit less store opex {usd(opex_annual, 2)}; {covered_annual}/{len(sy_all)} stores cover it<br>"
+                       f"Monthly reading rejected: x12 = {usd(opex_annual * 12, 1)}, only {covered_monthly} stores would cover it",
+                       (gp_known - opex_annual) >= 0), unsafe_allow_html=True)
 
 SECTION_LABELS = ["1 · What is this data set?", "2 · Row flow, staging and the model", "3 · Business questions", "4 · Outliers: what to do more of"]
 
 
+def glossary() -> pd.DataFrame:
+    tc = triage.set_index("issue_code")["rows"]
+    rows = [
+        ("Transaction ID", f"Sales-line identifier. Not unique: {flow['colliding_ids']:,} IDs appear twice.", "Event key, after keeping the newest ingested_at version"),
+        ("Transaction Date", f"Economic date of the sale. Only {flow['event_dates']} distinct dates, all the 1st of a month.", "date_key; YoY and seasonality"),
+        ("quantity", f"Signed units; negative = return/adjustment ({tc.get('NEGATIVE_QUANTITY_REVIEW', 0):,} lines). Eaches vs packs unconfirmed.", "Net sales, volume; kept signed"),
+        ("unit_price", "Selling price per quantity unit.", "Net sales = quantity x unit_price; average selling price"),
+        ("unit_cost", "Third cost column; equals standard_unit_cost on ~98% of rows.", "Not used; contract asks upstream to drop or define it"),
+        ("standard_unit_cost", f"Finance's budget cost. About 2x landed on pack_size 2, so read as a per-pack cost. Missing on {tc.get('MISSING_STANDARD_COST', 0):,} rows.", "Primary gross profit: quantity x standard / pack_size"),
+        ("landed_unit_cost", "What AP actually paid per unit.", "AP/Ops margin sensitivity"),
+        ("pack_size", "Units per pack (1 or 2); one value per product.", "Divides standard cost; provisional pack equivalents"),
+        ("Product index", f"Product ID. Null or 99901 = unknown ({tc.get('UNKNOWN_PRODUCT_KEY', 0):,} rows).", "product_key (-1 for Unknown)"),
+        ("Product Name", "Name on the transaction; can disagree with the catalog.", "Conflict detection only"),
+        ("product_name_catalog", "Catalog name. Product 19 carries two names (Vanities / Cosmetics).", "dim_product name (modal profile)"),
+        ("product_category", "Six categories.", "Top of the product hierarchy"),
+        ("product_effective_from / to", "Intended validity window; identical for both product-19 names, so not a real history.", "Not used for SCD2 (evidence below)"),
+        ("Store ID", f"Store key. Null or 99901 = unknown ({tc.get('UNKNOWN_STORE_KEY', 0):,} rows).", "store_key (-1 for Unknown)"),
+        ("store_name", f"Mostly a city name; not unique ({flow['store_names']} names for {flow['dim_store_known']} stores).", "Label; city proxy in seasonality view"),
+        ("state_code / state", "US state.", "Store hierarchy: region > state > store"),
+        ("region_name", "Census region; disagrees across rows for one Maryland store.", "Recomputed from state_code"),
+        ("store_type", "Nine civic types (City, Township, Borough, CDP, ...).", "Slicer, not a hierarchy level"),
+        ("store_sqft", "Floor area; one store reports 0.", "Sales, cost and gross profit per sqft"),
+        ("direct_store_operating_costs", "One figure per store, period unstated. Read as annual (see headline tile).", "Store contribution scenario"),
+        ("source_system", "POS / ERP / Manual lineage.", "Tie-break when two versions share ingested_at"),
+        ("ingested_at", "Load timestamp (lineage, not economic time).", "Newest version wins on colliding IDs"),
+    ]
+    return pd.DataFrame(rows, columns=["Column in the file", "What we understand", "How the model uses it"])
+
+
 # ============================================================================= 1. the data set
 def render_model() -> None:
-    st.markdown(swd.answer(
-        "What is this data set, and how many facts and dimensions does it have?",
-        f"One CSV extract of retail store transactions, {flow['source_rows']:,} rows covering {years[0]}–{years[-1]}. Each row is one "
-        f"transaction line with embedded product and store attributes. We normalised it into <b>one event fact</b> "
-        f"(<code>fct_sales</code>, {flow['fact_rows']:,} rows) and <b>three dimensions</b>: product ({flow['dim_product_known']} known + Unknown), "
-        f"store ({flow['dim_store_known']} known + Unknown) and date ({flow['dim_date']:,} calendar days). Six reporting marts and one "
-        f"triage table sit on top; they are aggregates, not additional facts."), unsafe_allow_html=True)
+    st.markdown(swd.answer("What is in the file?",
+                           f"One CSV, {flow['source_rows']:,} rows, {years[0]}–{years[-1]}: one sales line per row with product and store attributes repeated on every row."),
+                unsafe_allow_html=True)
+    st.dataframe(glossary(), hide_index=True, width="stretch", height=810,
+                 column_config={"Column in the file": st.column_config.TextColumn(width="medium"),
+                                "What we understand": st.column_config.TextColumn(width="large"),
+                                "How the model uses it": st.column_config.TextColumn(width="large")})
+
     c1, c2 = st.columns([1.3, 1])
     with c1:
+        st.markdown(swd.answer("How many facts and dimensions?",
+                               f"<b>1 event fact</b> ({flow['fact_rows']:,} rows) and <b>3 dimensions</b>: product {flow['dim_product_known']}+Unknown, "
+                               f"store {flow['dim_store_known']}+Unknown, date {flow['dim_date']:,} days. Six marts on top are aggregates, not more facts."),
+                    unsafe_allow_html=True)
         st.plotly_chart(swd.star_schema(
             "fct_sales", [f"{flow['fact_rows']:,} events (1 per transaction ID)", "signed quantity · unit price · pack size",
                           "net sales · standard cost · gross profit", "landed-cost and unadjusted sensitivities"],
@@ -127,40 +177,30 @@ def render_model() -> None:
              "dim_store": [f"{flow['dim_store']} rows", "region → state → store", "store_type, sqft, direct cost"],
              "dim_date": [f"{flow['dim_date']:,} days", f"{flow['date_min']} → {flow['date_max']}", "year / quarter / month"],
              "Aggregate marts": ["annual · monthly · product", "store · region · team KPI", "+ data-quality triage"]},
-            "A Kimball star: one event fact, three conformed dimensions", "Reporting marts are derived from the fact, never from the CSV"),
+            "A Kimball star: one event fact, three conformed dimensions", "Marts are derived from the fact, never from the CSV"),
             width="stretch", key="star")
     with c2:
-        st.markdown(swd.answer(
-            "Event fact or snapshot fact? Or both?",
-            f"<b>Event fact.</b> Every row is a transaction with a signed quantity, so the grain is the sale/return event. "
-            f"The extract has only {flow['event_dates']} distinct dates and every one is the 1st of a month "
-            f"({'confirmed' if flow['first_of_month_only'] else 'not confirmed'}), so it <i>looks</i> like a monthly feed, but the rows are "
-            f"still events, not inventory balances or dated store states. The monthly/annual marts are aggregates of the event fact, "
-            f"not a periodic-snapshot fact. If upstream later sends stock or store-state balances, that becomes a second, "
-            f"snapshot fact — not a change to this one."), unsafe_allow_html=True)
-        st.markdown(swd.answer(
-            "Kimball or One Big Table? Is a Type 2 dimension needed?",
-            "<b>Kimball.</b> Store and product attributes conflict inside the file (one product ID with two names, one store with two "
-            "regions), so an OBT would silently sum conflicting attributes. Conformed dimensions resolve each entity once (modal profile, "
-            "deterministic tie-break) and every mart reads the same answer. <b>Type 2: not yet.</b> The file carries "
-            "<code>product_effective_from/to</code>, but the evidence below shows both names of product 19 are live in every year with the "
-            "same window — that is a conflict, not history. We keep Type 1 dimensions and the data contract asks upstream for real "
-            "<code>valid_from/valid_to</code>; the model is ready to add SCD2 when a trustworthy history arrives."), unsafe_allow_html=True)
-        st.dataframe(conflict, hide_index=True, width="stretch",
-                     column_config={"rows": st.column_config.NumberColumn(format="%d")})
+        st.markdown(swd.answer("Event fact or snapshot fact?",
+                               f"<b>Event.</b> Rows are sales/returns, not balances. All {flow['event_dates']} dates are the 1st of a month, so it looks "
+                               f"monthly, but the monthly marts are aggregates of events, not a periodic snapshot."), unsafe_allow_html=True)
+        st.markdown(swd.answer("Kimball or One Big Table?",
+                               "<b>Kimball.</b> Product and store attributes conflict inside the file; conformed dimensions resolve each entity once, "
+                               "an OBT would sum the conflicts."), unsafe_allow_html=True)
+        st.markdown(swd.answer("Type 2 dimension?",
+                               "<b>Not yet.</b> The effective dates are not a history: product 19 is 'Vanities' and 'Cosmetics' in every year with the "
+                               "same window. Type 1 now; SCD2 when upstream sends real valid_from/valid_to."), unsafe_allow_html=True)
+        st.dataframe(conflict[["product_name_catalog", "product_effective_from", "product_effective_to", "first_seen", "last_seen", "rows"]],
+                     hide_index=True, width="stretch", column_config={"rows": st.column_config.NumberColumn(format="%d")})
 
-    st.markdown(swd.answer(
-        "What do we do about the dirty data?",
-        f"We never drop it. Every suspect row is kept in staging and listed in <code>mart_data_quality_triage</code> "
-        f"({flow['triage_rows']:,} issue rows on {flow['triage_fingerprints']:,} distinct source rows; a row can carry several issues). "
-        f"Only the {flow['excluded_versions']:,} older versions of colliding transaction IDs are excluded from the fact; unknown keys, returns "
-        f"and missing costs stay in the fact and are flagged. The triage table is rebuilt on every run (a reviewable exception list, not a "
-        f"ticket queue). <code>DATA_CONTRACT.md</code> tells upstream what we expect in the transactions file: a real line key, explicit "
-        f"unknown semantics, one labelled grain per cost column, effective dates, and no silent re-sends."), unsafe_allow_html=True)
+    st.markdown(swd.answer("What happens to dirty data?",
+                           f"Nothing is deleted. Colliding IDs: newest <code>ingested_at</code> version goes to the fact, the older one to "
+                           f"<code>mart_data_quality_triage</code>. Unknown keys, returns and missing costs stay in the fact and are flagged "
+                           f"({flow['triage_rows']:,} issue rows; rebuilt every run). <code>DATA_CONTRACT.md</code> states what we expect upstream."),
+                unsafe_allow_html=True)
     tri = triage.copy()
     tri["label"] = tri["issue_code"].str.replace("_", " ").str.capitalize()
-    show(swd.bar_ranked(tri, "label", "rows", "Duplicate ID versions dominate the exception list; nothing is deleted",
-                        "Issue rows in mart_data_quality_triage (both versions of a collision are listed)", label_all=True,
+    show(swd.bar_ranked(tri, "label", "rows", "Older duplicate versions are the biggest triage category; nothing is deleted",
+                        "Issue rows in mart_data_quality_triage (one row per older duplicate version)", label_all=True,
                         highlight="Duplicate transaction id"), tri, "triage")
 
 # ============================================================================= 2. row flow & model

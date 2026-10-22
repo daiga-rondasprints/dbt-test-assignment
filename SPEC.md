@@ -51,7 +51,8 @@
 ## Decisions and evidence
 
 - **Duplicate IDs:** 9,815 transaction IDs each have two source rows (19,630 rows total;
-  9,815 excess rows). For all such pairs the observed sales payload (date, quantity,
+  9,815 excess rows). The newer `ingested_at` version is selected into the fact and the
+  older version is moved to `mart_data_quality_triage` (one triage row per collision). For all such pairs the observed sales payload (date, quantity,
   price, pack size, product, store, landed cost) matches; unit/standard costs and
   ingestion/source metadata are the fields that can differ.
   Keep the latest `ingested_at`, as Sales Ops proposes. Ties prefer POS, then ERP, then
@@ -79,17 +80,21 @@
 - **Profit language:** net sales are signed quantity times unit price. Gross profit is
   net sales less standard cost of sales (only on standard-cost-covered rows); gross
   margin is that gross profit divided by the matching standard-costed net sales. Landed
-  gross profit/margin use landed unit cost as a separate sensitivity. Opex timing is
-  ambiguous, so store marts show annual and monthly direct-cost scenarios separately.
-  Neither is net profit; taxes, central costs, and full operating expenses are absent.
+  gross profit/margin use landed unit cost as a separate sensitivity. Neither is net
+  profit; taxes, central costs, and full operating expenses are absent.
+- **Store opex period (FP&A vs Store Finance):** `direct_store_operating_costs` is read
+  as **annual**. Evidence: read as annual it totals $3.35m in 2022 (26% of net sales,
+  66% of gross profit); read as monthly (x12) it would be $40m, eight times gross profit,
+  and only 4 of 287 stores would cover it. The monthly reading is kept only as a
+  labelled sensitivity (`gross_profit_less_direct_cost_monthly_scenario`).
 
 ## Known limits to investigate
 
 - Verify the pack-level interpretation of standard cost and the effective date of cost
   changes, particularly the 2022 divergence between standard and landed cost.
 - Reconcile the product-name/catalog conflict and store 50's restated operating cost.
-- Confirm whether direct store operating cost is annual or monthly before using the
-  contribution scenarios for budgeting.
+- Have Store Finance confirm the annual reading of direct store operating cost; the
+  model would need only a config change if it is monthly.
 - Resolve source unknown IDs and review negative-quantity adjustments and returns.
 - Confirm whether transaction quantity is packs or individual items and the exact
   grains of unit price, standard cost, and landed cost before promoting physical-unit
