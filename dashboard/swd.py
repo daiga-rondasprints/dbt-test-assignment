@@ -229,3 +229,8 @@ def star_schema(fact: str, fact_lines: list[str], dims: dict[str, list[str]], ti
     fig.update_layout(**base_layout(title, subtitle, height=height))
     fig.update_layout(margin=dict(l=8, r=8, t=74, b=8))
     return fig
+
+
+def prose(text: str) -> str:
+    """Plain-English answer paragraph without a repeated question (used inside expanders)."""
+    return f"<div style='font-size:14px;color:{GREY_DARK};line-height:1.45;margin:0 0 8px 0'>{text}</div>"

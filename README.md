@@ -60,7 +60,7 @@ data/raw/              # consolidated_transactions.csv — do not edit
 models/staging/        # Start here (_sources.yml + sample staging model)
 models/intermediate/   # Normalization / business logic
 models/marts/          # Dims + facts
-presentation/          # CEO debrief PowerPoint
+presentation/          # CEO debrief PowerPoint + dashboard deck (PPTX/PDF)
 dashboard/             # Streamlit app: every assignment question answered in words + one chart
 analyses/              # Optional ad-hoc SQL for Part B
 profiles.yml
@@ -129,6 +129,18 @@ categories. Add `?section=3` to the URL to open one section on its own. Each
 chart has an "Audit CSV" button that downloads the aggregate behind it. Styling
 follows the Storytelling-with-Data rules in `dashboard/swd.py` (grey baseline,
 one accent colour, action titles, no chart junk).
+
+## Export the dashboard as a slide deck (PPTX + PDF)
+
+With the dashboard running, capture every collapsible visual as a slide:
+
+```bash
+uv run --group dashboard --with playwright python scripts/export_dashboard_deck.py
+```
+
+Writes `presentation/retail_dashboard_deck.pptx` and `.pdf` (title, agenda, one divider per tab,
+one slide per visual). Playwright needs a Chromium; set `DASHBOARD_CHROME=/path/to/chrome` to use an
+existing binary. PDF conversion uses LibreOffice when installed.
 
 ## Stack
 

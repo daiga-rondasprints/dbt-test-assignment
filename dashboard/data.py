@@ -24,7 +24,8 @@ EVENTS = f"""
         f.transaction_id, f.transaction_date, d.calendar_year as year, d.month_number, d.month_name, d.month_start,
         p.product_key, p.product_name, p.product_category, p.pack_size,
         s.store_key, s.store_name, s.state_code, s.state, s.region_name, s.store_type, s.store_sqft,
-        f.quantity, f.net_sales, f.standard_cost_of_sales, f.gross_profit,
+        f.quantity, f.net_sales, f.standard_cost_of_sales, f.gross_profit, f.landed_gross_profit, f.landed_cost_of_sales,
+        f.standard_unit_cost, f.landed_unit_cost,
         case when f.gross_profit is not null then f.net_sales end as costed_net_sales,
         f.is_return_or_adjustment
     from {FACT} f
@@ -107,3 +108,46 @@ def events() -> pd.DataFrame:
 
 def scorecard() -> pd.DataFrame:
     return query("select * from main_marts.mart_team_kpi_scorecard order by year, team_view, metric_code")
+
+
+def dbt_inventory() -> dict:
+    """Models, tests and last run status from dbt's own artifacts (target/manifest.json, run_results.json)."""
+    import json
+    from collections import Counter
+
+    out = {"models": 0, "layers": {}, "tests": 0, "test_types": {}, "singular": 0, "packages": [], "sources": 0,
+           "dbt_version": "", "adapter": "", "last_run_pass": None, "last_run_total": None}
+    manifest = ROOT / "target" / "manifest.json"
+    if manifest.exists():
+        m = json.loads(manifest.read_text())
+        nodes = m["nodes"].values()
+        models = [n for n in nodes if n["resource_type"] == "model"]
+        tests = [n for n in nodes if n["resource_type"] == "test"]
+        out["models"] = len(models)
+        out["layers"] = dict(Counter(n["path"].split("/")[0] for n in models))
+        out["tests"] = len(tests)
+        types = Counter()
+        for t in tests:
+            meta = t.get("test_metadata")
+            types[meta["name"] if meta else "singular SQL"] += 1
+        out["test_types"] = dict(types)
+        out["singular"] = types.get("singular SQL", 0)
+        out["packages"] = sorted({t["package_name"] for t in tests})
+        out["sources"] = sum(1 for n in m.get("sources", {}).values())
+        out["dbt_version"] = m["metadata"].get("dbt_version", "")
+        out["adapter"] = m["metadata"].get("adapter_type", "")
+    results = ROOT / "target" / "run_results.json"
+    if results.exists():
+        r = json.loads(results.read_text())["results"]
+        out["last_run_total"] = len(r)
+        out["last_run_pass"] = sum(1 for x in r if x["status"] in ("pass", "success"))
+    return out
+
+
+def icon_svg(name: str, color: str = "#212529", size: int = 30) -> str:
+    """Inline SVG for a Simple Icons glyph stored under dashboard/assets/icons (CC0)."""
+    path = Path(__file__).resolve().parent / "assets" / "icons" / f"{name}.svg"
+    if not path.exists():
+        return ""
+    svg = path.read_text().strip()
+    return svg.replace("<svg ", f'<svg fill="{color}" width="{size}" height="{size}" style="vertical-align:middle" ', 1)
