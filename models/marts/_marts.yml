@@ -1,0 +1,123 @@
+version: 2
+
+models:
+  - name: dim_product
+    description: Product dimension with one modal catalog/category profile per source product ID and an explicit Unknown member.
+    columns:
+      - name: product_key
+        tests:
+          - not_null
+          - unique
+      - name: product_name
+        tests:
+          - not_null
+      - name: is_unknown
+        tests:
+          - not_null
+
+  - name: dim_store
+    description: >
+      Store dimension with one modal source profile per store ID. Region is
+      standardized from state_code where available; direct operating cost is
+      retained once per store, not summed across transaction rows.
+    columns:
+      - name: store_key
+        tests:
+          - not_null
+          - unique
+      - name: store_name
+        tests:
+          - not_null
+      - name: region_name
+        tests:
+          - not_null
+      - name: is_unknown
+        tests:
+          - not_null
+
+  - name: fct_sales
+    description: >
+      One row per transaction_id after source-version selection. Signed quantity
+      preserves returns. Net sales include all rows; standard-cost gross profit
+      is calculated only where standard cost is available. Standard cost is
+      divided by pack_size to align it with unit_price; landed cost is a separate
+      sensitivity measure. Gross profit is not net profit.
+    columns:
+      - name: transaction_id
+        tests:
+          - not_null
+          - unique
+      - name: product_key
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_product')
+                field: product_key
+      - name: store_key
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_store')
+                field: store_key
+      - name: transaction_date
+        tests:
+          - not_null
+      - name: quantity
+        tests:
+          - not_null
+      - name: net_sales
+        tests:
+          - not_null
+
+  - name: mart_annual_sales
+    description: Annual topline, cost-coverage, and YoY reporting. YoY percentages compare consecutive complete calendar years.
+    columns:
+      - name: year
+        tests:
+          - not_null
+          - unique
+      - name: net_sales
+        tests:
+          - not_null
+
+  - name: mart_monthly_sales
+    description: Monthly net sales and gross-profit trend with 12-month YoY comparisons.
+    columns:
+      - name: month_start
+        tests:
+          - not_null
+          - unique
+
+  - name: mart_product_performance
+    description: Annual product-level sales, gross-profit, margin, returns, and YoY metrics.
+    columns:
+      - name: product_key
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_product')
+                field: product_key
+
+  - name: mart_region_performance
+    description: Annual regional sales and gross-profit metrics using the normalized store region.
+    columns:
+      - name: region_name
+        tests:
+          - not_null
+
+  - name: mart_store_performance
+    description: >
+      Annual store sales and gross profit. The two direct-cost scenarios show
+      gross profit less the observed store cost interpreted as annual or monthly;
+      neither is labelled or presented as net profit.
+    columns:
+      - name: store_key
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_store')
+                field: store_key

@@ -3,12 +3,29 @@ version: 2
 models:
   - name: stg_consolidated_transactions
     description: >
-      Sample staging model for the denormalized landing extract.
-      Next step for candidates: normalize into dims + fact (this model alone is not the end state).
+      Typed and consistently named view of the raw extract. This preserves all
+      source rows, including transaction-ID collisions, returns, and missing
+      product/store identifiers; downstream models handle those explicitly.
     columns:
       - name: transaction_id
-        description: Business transaction id (not unique in the raw extract).
+        description: Source transaction identifier; collisions are resolved downstream.
+        tests:
+          - not_null
+      - name: transaction_date
+        description: Economic transaction date, retained separately from ingestion time.
+        tests:
+          - not_null
+      - name: ingested_at
+        description: Source lineage timestamp; not treated as the economic transaction date.
+      - name: source_row_fingerprint
+        description: Deterministic hash of the typed source row; the upstream extract has no line ID.
         tests:
           - not_null
       - name: quantity
-        description: May be negative for returns.
+        description: Signed unit quantity; negative values are retained as returns or adjustments.
+      - name: product_id
+        description: Nullable source product identifier; 99901 is a source unknown placeholder.
+      - name: store_id
+        description: Nullable source store identifier; 99901 is a source unknown placeholder.
+      - name: pack_size
+        description: Units in a selling pack; used to align standard cost to the unit-price grain.

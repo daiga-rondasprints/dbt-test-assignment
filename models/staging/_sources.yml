@@ -25,9 +25,15 @@ sources:
           - name: Product Name
           - name: product_name_catalog
           - name: product_category
+          - name: product_effective_from
+          - name: product_effective_to
           - name: Store ID
           - name: store_name
           - name: state_code
+          - name: state
           - name: region_name
+          - name: store_type
+          - name: store_sqft
+          - name: direct_store_operating_costs
           - name: source_system
           - name: ingested_at

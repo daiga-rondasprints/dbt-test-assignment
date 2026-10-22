@@ -1,0 +1,27 @@
+version: 2
+
+models:
+  - name: int_sales_transactions
+    description: >
+      One selected source version per transaction ID. The source shows identical
+      economic attributes across each collision, with cost and lineage differences;
+      latest ingestion is selected, with a documented deterministic tie-break.
+      Null and 99901 product/store keys are mapped to the Unknown dimension member.
+    columns:
+      - name: transaction_id
+        description: Source transaction ID; the selected business-event grain.
+        tests:
+          - not_null
+          - unique
+      - name: product_key
+        description: Product ID, or -1 for missing and source placeholder keys.
+        tests:
+          - not_null
+      - name: store_key
+        description: Store ID, or -1 for missing and source placeholder keys.
+        tests:
+          - not_null
+      - name: duplicate_source_row_count
+        description: Number of raw source rows carrying this transaction ID.
+        tests:
+          - not_null

@@ -1,0 +1,13 @@
+{
+  "name": "retail-ceo-presentation",
+  "private": true,
+  "scripts": {
+    "build:presentation": "node scripts/build_presentation.js"
+  },
+  "devDependencies": {
+    "pptxgenjs": "4.0.0"
+  },
+  "overrides": {
+    "image-size": "2.0.3"
+  }
+}
