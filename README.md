@@ -61,6 +61,7 @@ models/staging/        # Start here (_sources.yml + sample staging model)
 models/intermediate/   # Normalization / business logic
 models/marts/          # Dims + facts
 presentation/          # CEO debrief PowerPoint
+dashboard/             # Streamlit app: every assignment question answered in words + one chart
 analyses/              # Optional ad-hoc SQL for Part B
 profiles.yml
 dbt_project.yml
@@ -108,6 +109,27 @@ metrics are read from the built DuckDB marts; no slide query re-aggregates the
 raw CSV. It includes the row-count/disposition flow, dimension hierarchies,
 per-square-foot metrics, and cross-team KPI views.
 
+## Run the dashboard
+
+An interactive Streamlit app answers the modelling questions (facts/dimensions,
+event vs snapshot, dirty-data triage, Kimball vs OBT, SCD2), draws the row-count
+flow, and works through the business questions (category profitability by
+region/state, store size vs performance, products losing favour, cost vs margin,
+quantity vs margin, store type vs profitability overall and per category,
+seasonality by product and by state/store) plus store-month and product-hierarchy
+outlier scatters. Every number is read from the built DuckDB marts, never the CSV.
+
+```bash
+uv sync --group dashboard
+uv run --group dashboard streamlit run dashboard/app.py
+```
+
+Open http://localhost:8501. Use the left pane to set the year, regions and
+categories. Add `?section=3` to the URL to open one section on its own. Each
+chart has an "Audit CSV" button that downloads the aggregate behind it. Styling
+follows the Storytelling-with-Data rules in `dashboard/swd.py` (grey baseline,
+one accent colour, action titles, no chart junk).
+
 ## Stack
 
 | Tool | Role |
@@ -115,6 +137,7 @@ per-square-foot metrics, and cross-team KPI views.
 | [uv](https://docs.astral.sh/uv/) | Package / environment manager |
 | [dbt-core](https://docs.getdbt.com/) + [dbt-duckdb](https://github.com/duckdb/dbt-duckdb) | Transformation framework |
 | [DuckDB](https://duckdb.org/) | Local analytical database |
+| [Streamlit](https://streamlit.io/) + [Plotly](https://plotly.com/python/) | Interactive dashboard (optional `dashboard` dependency group) |
 
 ## Verify the environment
 

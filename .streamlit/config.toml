@@ -1,0 +1,20 @@
+[theme]
+base = "light"
+primaryColor = "#95C11F"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F8F9FA"
+textColor = "#212529"
+font = "Open Sans, sans-serif"
+
+# Load Open Sans the supported way (no CSS font overrides, so Streamlit's icon font keeps working).
+[[theme.fontFaces]]
+family = "Open Sans"
+url = "https://fonts.gstatic.com/s/opensans/v40/memvYaGs126MiZpBA-UvWbX2vVnXBbObj2OVTS-mu0SC55I.woff2"
+weight = "300 800"
+style = "normal"
+
+[browser]
+gatherUsageStats = false
+
+[server]
+headless = true
