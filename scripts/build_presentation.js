@@ -310,6 +310,76 @@ function newSlide(eyebrow, title, subtitle = '') {
   addNote(slide, 'The current triage relation is rebuilt from source; do not edit it to record dispositions. Durable ownership belongs in a ticket or append-only issue workflow. Type 2 would be justified when stakeholders need historical attributes and the source supplies reliable effective intervals. Product effective-date fields exist but do not currently establish a trustworthy changing profile for known products.');
 }
 
+{
+  const slide = newSlide('Record-level flow', 'No mystery drops: every duplicate version has a disposition', 'Rows in issue categories can overlap; only displaced transaction versions leave the event fact.');
+  const blocks = [
+    { x: 0.78, w: 2.45, title: 'RAW CSV', amount: d.source_rows.toLocaleString(), note: 'Original landing rows' },
+    { x: 3.77, w: 2.45, title: 'PERSISTED STAGING', amount: d.staging_rows.toLocaleString(), note: 'Full table replace on rebuild' },
+    { x: 6.76, w: 2.55, title: 'VERSION AUDIT', amount: d.audited_version_rows.toLocaleString(), note: 'Ranked, none appended' },
+    { x: 9.85, w: 2.66, title: 'EVENT FACT', amount: d.fact_rows.toLocaleString(), note: 'One selected row per ID' },
+  ];
+  blocks.forEach((b) => {
+    slide.addShape(pptx.ShapeType.roundRect, { x: b.x, y: 2.0, w: b.w, h: 1.25, rectRadius: 0.07, fill: { color: C.white }, line: { color: C.light, width: 0.8 } });
+    addText(slide, b.title, b.x + 0.16, 2.16, b.w - 0.28, 0.2, { fontSize: 9, bold: true, color: C.darkLime });
+    addText(slide, b.amount, b.x + 0.16, 2.49, b.w - 0.28, 0.34, { fontSize: 19, bold: true });
+    addText(slide, b.note, b.x + 0.16, 2.93, b.w - 0.28, 0.18, { fontSize: 9, color: C.gray });
+  });
+  blocks.slice(0, -1).forEach((b, i) => {
+    slide.addShape(pptx.ShapeType.line, { x: b.x + b.w + 0.08, y: 2.63, w: blocks[i + 1].x - b.x - b.w - 0.16, h: 0, line: { color: C.darkLime, width: 1.8, endArrowType: 'triangle' } });
+  });
+  slide.addShape(pptx.ShapeType.roundRect, { x: 3.8, y: 3.82, w: 4.1, h: 1.0, rectRadius: 0.07, fill: { color: C.paleRed }, line: { color: C.paleRed, transparency: 100 } });
+  addText(slide, `${d.duplicate_candidate_rows_in_triage.toLocaleString()} duplicate-version rows`, 4.0, 3.98, 3.75, 0.28, { fontSize: 15, bold: true, color: C.red });
+  addText(slide, `${d.deduplicated_transaction_ids.toLocaleString()} IDs x 2 versions; both versions are logged in triage.`, 4.0, 4.37, 3.7, 0.25, { fontSize: 9, color: C.gray });
+  slide.addShape(pptx.ShapeType.roundRect, { x: 8.35, y: 3.82, w: 4.08, h: 1.0, rectRadius: 0.07, fill: { color: 'E7EDF4' }, line: { color: 'E7EDF4', transparency: 100 } });
+  addText(slide, `${d.excluded_duplicate_versions.toLocaleString()} versions excluded`, 8.56, 3.98, 3.7, 0.28, { fontSize: 15, bold: true, color: C.navy });
+  addText(slide, `Latest version retained; older rows remain queryable in the audit.`, 8.56, 4.37, 3.7, 0.25, { fontSize: 9, color: C.gray });
+  addText(slide, `${d.all_triage_issue_rows.toLocaleString()} total issue rows / ${d.distinct_source_rows_flagged.toLocaleString()} distinct source rows flagged (categories overlap).`, 0.95, 5.28, 11.4, 0.32, { fontSize: 12, bold: true });
+  addText(slide, 'Unknown keys, missing costs, negative quantities and attribute conflicts are retained/flagged, not dropped. Only 9,815 displaced ID versions are excluded from the fact.', 0.95, 5.78, 11.4, 0.55, { fontSize: 10, color: C.gray, valign: 'top' });
+  addNote(slide, 'The CSV has 509,480 rows and 499,665 distinct transaction IDs, leaving 9,815 excess versions. The version audit keeps all 509,480 rows; one latest version per ID feeds the 499,665-row fact and 9,815 older versions are explicitly marked for triage. The duplicate issue category contains both versions for each collided ID (19,630 rows). Other issue categories overlap, so their counts must not be summed as distinct dropped records.');
+}
+
+{
+  const slide = newSlide('Star schema and drill paths', 'Three dimensions; one event fact; no fake snapshot', 'Date filters are standard for reporting, but an event fact does not require every query to specify a range.');
+  addCard(slide, 0.78, 1.92, 3.78, 1.35, 'DIM_DATE', d.date_dimension_rows.toLocaleString(), `${d.date_dimension_start} to ${d.date_dimension_end}; daily calendar`);
+  addCard(slide, 4.78, 1.92, 3.78, 1.35, 'DIM_PRODUCT', `${d.product_dimension_total_rows} rows`, `${d.product_dimension_rows} known + Unknown`, C.navy);
+  addCard(slide, 8.78, 1.92, 3.78, 1.35, 'DIM_STORE', `${d.store_dimension_total_rows} rows`, `${d.store_dimension_rows} known + Unknown`, C.navy);
+  slide.addShape(pptx.ShapeType.roundRect, { x: 4.12, y: 3.66, w: 5.1, h: 0.86, rectRadius: 0.07, fill: { color: C.ink }, line: { color: C.ink, transparency: 100 } });
+  addText(slide, `FCT_SALES  |  ${d.fact_rows.toLocaleString()} rows`, 4.35, 3.9, 4.65, 0.34, { fontSize: 17, bold: true, color: C.white, align: 'center' });
+  addText(slide, 'Category  ->  product ID / name', 0.96, 4.92, 3.62, 0.3, { fontSize: 11, bold: true });
+  addText(slide, `Pack size is a packaging attribute (1 or 2), not a hierarchy level. ${d.product_hierarchy.length} categories in source.`, 0.96, 5.3, 3.7, 0.66, { fontSize: 10, color: C.gray, valign: 'top' });
+  addText(slide, 'Region  ->  state  ->  store ID', 4.86, 4.92, 3.62, 0.3, { fontSize: 11, bold: true });
+  addText(slide, 'Store type is a slice. Store name alone is not unique.', 4.86, 5.3, 3.62, 0.5, { fontSize: 10, color: C.gray, valign: 'top' });
+  addText(slide, 'Year / quarter / month / day', 8.78, 4.92, 3.62, 0.3, { fontSize: 11, bold: true });
+  addText(slide, 'All 499,665 events happen on 48 first-of-month dates; the calendar still provides 1,461 days.', 8.78, 5.3, 3.7, 0.65, { fontSize: 10, color: C.gray, valign: 'top' });
+  addText(slide, 'Annual/monthly and product/store/region reports are aggregate marts, not additional fact tables.', 0.98, 6.3, 11.5, 0.3, { fontSize: 10, bold: true, color: C.darkLime });
+  addNote(slide, 'This is a 3-dimension, 1-event-fact star. The date dimension is a complete calendar, even though the extract has only one day-of-month. The reported row counts include the Unknown member for product and store. The project has aggregate marts for convenient reporting, not a second periodic-snapshot fact. Date filtering is recommended for a business report and enables time drilldowns; it is not a condition for a mathematically valid event-fact query.');
+}
+
+{
+  const slide = newSlide('Shared formulae, separate views', 'Teams get their own tabs; management gets one global truth', 'Filter by team in mart_team_kpi_scorecard. The global measures are repeated, never redefined.');
+  const area = d.store_productivity_2022;
+  addCard(slide, 0.8, 1.9, 3.72, 1.42, 'Portfolio net sales / sqft', `$${area.net_sales_per_sqft.toFixed(2)}`, `${area.valid_area_store_count}/${area.known_store_count} stores have positive reported area`);
+  addCard(slide, 4.8, 1.9, 3.72, 1.42, 'Standard cost / sqft', `$${area.standard_cost_per_sqft.toFixed(2)}`, 'Area-covered stores; standard basis', C.navy);
+  addCard(slide, 8.8, 1.9, 3.72, 1.42, 'Gross profit / sqft', `$${area.gross_profit_per_sqft.toFixed(2)}`, 'Sales/sqft minus standard COGS/sqft');
+  const views = [
+    ['CEO / Management', 'Net sales, gross profit, margin, YoY'],
+    ['Finance', 'Standard vs landed GM; cost coverage; opex-period scenarios'],
+    ['Merchandising', 'Category growth, gross profit, selling units, pack-equivalent scenario'],
+    ['Store Operations', 'Sales, cost and gross profit / sqft; area coverage'],
+    ['Sales Ops', 'Sales / event; return-line rate; ID-version monitoring'],
+  ];
+  views.forEach((row, i) => {
+    const col = i < 3 ? 0 : 1;
+    const rowNum = i < 3 ? i : i - 3;
+    const x = 0.98 + col * 6.15;
+    const y = 3.7 + rowNum * 0.68;
+    addText(slide, row[0], x, y, 2.2, 0.28, { fontSize: 10, bold: true, color: C.darkLime });
+    addText(slide, row[1], x + 2.25, y, 3.75, 0.45, { fontSize: 9, color: C.gray, valign: 'top' });
+  });
+  addText(slide, 'Quantity, price and cost grains still need an upstream contract. Pack-equivalent counts are provisional; gross profit is not net profit.', 0.98, 6.28, 11.45, 0.42, { fontSize: 9, bold: true, color: C.red });
+  addNote(slide, `The 2022 weighted area productivity is $${area.net_sales_per_sqft.toFixed(2)} net sales, $${area.standard_cost_per_sqft.toFixed(2)} standard cost of sales and $${area.gross_profit_per_sqft.toFixed(2)} gross profit per reported square foot. The denominator is ${Math.round(area.sqft_denominator).toLocaleString()} sqft across stores with valid positive area. Store 200 has zero sqft and is flagged, not included in the area ratio; its sales are not removed from company sales. The different team tabs share global net sales and standard gross-profit formulas. Landed cost, unadjusted-versus-pack-adjusted standard cost, and monthly-versus-annual store cost remain explicitly labelled sensitivity views, not competing definitions or net profit.`);
+}
+
 if (pptx._slides.length < 8 || pptx._slides.length > 12) {
   throw new Error(`Expected 8-12 slides, found ${pptx._slides.length}`);
 }

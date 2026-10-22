@@ -2,7 +2,7 @@
 
 with source_rows as (
 
-    select * from {{ ref('stg_consolidated_transactions') }}
+    select * from {{ ref('int_transaction_versions') }}
 
 ),
 
@@ -24,10 +24,16 @@ source_row_issues as (
         store_id,
         source_system,
         ingested_at,
+        source_version_rank,
+        version_disposition,
         'source_row' as issue_scope,
         'DUPLICATE_TRANSACTION_ID' as issue_code,
         'review' as severity,
-        'Multiple source rows share this ID; the latest ingested version is selected in the fact.' as issue_details
+        case
+            when version_disposition = 'selected_for_fact'
+                then 'Selected version; other source versions for this ID are retained in triage.'
+            else 'Duplicate source version excluded from the fact; latest ingested version is selected.'
+        end as issue_details
     from source_rows
     where transaction_id in (select transaction_id from duplicate_ids)
 
@@ -40,6 +46,8 @@ source_row_issues as (
         store_id,
         source_system,
         ingested_at,
+        cast(null as bigint),
+        cast(null as varchar),
         'source_row',
         'UNKNOWN_PRODUCT_KEY',
         'review',
@@ -56,6 +64,8 @@ source_row_issues as (
         store_id,
         source_system,
         ingested_at,
+        cast(null as bigint),
+        cast(null as varchar),
         'source_row',
         'UNKNOWN_STORE_KEY',
         'review',
@@ -72,6 +82,8 @@ source_row_issues as (
         store_id,
         source_system,
         ingested_at,
+        cast(null as bigint),
+        cast(null as varchar),
         'source_row',
         'MISSING_STANDARD_COST',
         'review',
@@ -88,6 +100,8 @@ source_row_issues as (
         store_id,
         source_system,
         ingested_at,
+        cast(null as bigint),
+        cast(null as varchar),
         'source_row',
         'NEGATIVE_QUANTITY_REVIEW',
         'information',
@@ -107,6 +121,7 @@ product_conflicts as (
     having count(distinct product_name_catalog) > 1
         or count(distinct product_name_on_transaction) > 1
         or count(distinct product_category) > 1
+        or count(distinct pack_size) > 1
 
 ),
 
@@ -119,10 +134,12 @@ product_issues as (
         cast(null as integer) as store_id,
         cast(null as varchar) as source_system,
         cast(null as timestamp) as ingested_at,
+        cast(null as bigint) as source_version_rank,
+        cast(null as varchar) as version_disposition,
         'product' as issue_scope,
         'CONFLICTING_PRODUCT_ATTRIBUTES' as issue_code,
         'review' as severity,
-        'Product name or category varies across source rows; dimension selects the modal profile.' as issue_details
+        'Product name, category, or pack size varies across source rows; dimension selects the modal profile.' as issue_details
     from product_conflicts
 
 ),
@@ -153,11 +170,34 @@ store_issues as (
         store_id,
         cast(null as varchar) as source_system,
         cast(null as timestamp) as ingested_at,
+        cast(null as bigint) as source_version_rank,
+        cast(null as varchar) as version_disposition,
         'store' as issue_scope,
         'CONFLICTING_STORE_ATTRIBUTES' as issue_code,
         'review' as severity,
         'Store attributes vary across source rows; dimension selects the modal profile and derives region from state code.' as issue_details
     from store_conflicts
+
+    union all
+
+    select
+        cast(null as varchar) as source_row_fingerprint,
+        cast(null as integer) as transaction_id,
+        cast(null as integer) as product_id,
+        store_id,
+        cast(null as varchar) as source_system,
+        cast(null as timestamp) as ingested_at,
+        cast(null as bigint) as source_version_rank,
+        cast(null as varchar) as version_disposition,
+        'store' as issue_scope,
+        'INVALID_STORE_SQUARE_FOOTAGE' as issue_code,
+        'review' as severity,
+        'Store square footage is missing or non-positive; area productivity is not calculated for this store.' as issue_details
+    from source_rows
+    where store_id is not null
+      and store_id != 99901
+      and (store_sqft is null or store_sqft <= 0)
+    group by store_id
 
 )
 

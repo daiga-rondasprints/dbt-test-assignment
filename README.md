@@ -54,6 +54,7 @@ DuckDB database file: `retail.duckdb` at the repo root (gitignored).
 ASSIGNMENT.md          # Candidate brief
 SPEC.md                # Model grain and analytical assumptions
 DATA_CONTRACT.md       # Proposed upstream schema and delivery rules
+METRIC_DICTIONARY.md   # Shared global metrics and team-specific KPI views
 AI-LOG.md              # AI use and validation summary
 data/raw/              # consolidated_transactions.csv — do not edit
 models/staging/        # Start here (_sources.yml + sample staging model)
@@ -69,9 +70,14 @@ pyproject.toml
 ## Implemented model and decisions
 
 The normalized design has one sales **event fact** (one selected row per
-`transaction_id`), a product dimension, and a store dimension. It is not an
-OBT or a periodic snapshot: the input contains transactions, not balances.
-Annual and monthly reporting models are marts built from the fact and dimensions.
+`transaction_id`), plus date, product and store dimensions. It is not an OBT or
+a periodic snapshot: the input contains transactions, not balances. Annual and
+monthly reporting models aggregate the fact and dimensions.
+
+Staging is a persisted DuckDB table rebuilt from the immutable CSV on every
+`dbt build`. dbt replaces the table instead of appending, and tests check the
+source row count and unique row fingerprint. Re-running the same build therefore
+does not accumulate duplicate staging records; it is a full refresh, not CDC.
 
 The source is retained in staging. Duplicate transaction versions, missing or
 placeholder keys, missing standard cost, negative quantities, and conflicting
@@ -80,7 +86,11 @@ are mapped to explicit Unknown dimension members, and negative quantities remain
 in signed sales. The triage table is rebuilt from source; it is not an editable
 workflow queue. See [SPEC.md](./SPEC.md) and [DATA_CONTRACT.md](./DATA_CONTRACT.md)
 for grain, cost assumptions, exception handling, and the proposed upstream
-contract.
+contract. The fact reports the source quantity unchanged. `pack_size` supplies a
+separate provisional physical-unit calculation; do not alter revenue unless the
+upstream team confirms quantity and price grain. See
+[METRIC_DICTIONARY.md](./METRIC_DICTIONARY.md) for one global formula set and
+the Finance, Merchandising, Store Operations, and Sales Ops report views.
 
 ## Build the presentation
 
@@ -93,8 +103,10 @@ npm ci
 npm run build:presentation
 ```
 
-The resulting deck is `presentation/retail_ceo_debrief.pptx`. Slide metrics are
-read from the built DuckDB marts; no slide query re-aggregates the raw CSV.
+The resulting deck is `presentation/retail_ceo_debrief.pptx` (12 slides). Slide
+metrics are read from the built DuckDB marts; no slide query re-aggregates the
+raw CSV. It includes the row-count/disposition flow, dimension hierarchies,
+per-square-foot metrics, and cross-team KPI views.
 
 ## Stack
 

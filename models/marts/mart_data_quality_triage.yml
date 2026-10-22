@@ -11,6 +11,10 @@ models:
         description: Content fingerprint for row-level issues; null for entity-level conflicts.
       - name: transaction_id
         description: Source transaction ID, when the issue is row-specific.
+      - name: source_version_rank
+        description: Deterministic source version rank; rank 1 is selected and later ranks are excluded from the event fact.
+      - name: version_disposition
+        description: Whether the source row is selected into the fact or retained in duplicate-version triage.
       - name: issue_scope
         tests:
           - not_null
@@ -26,6 +30,11 @@ models:
           - accepted_values:
               arguments:
                 values: ['review', 'information']
+      - name: version_disposition
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['selected_for_fact', 'triage_duplicate_version']
       - name: issue_details
         tests:
           - not_null

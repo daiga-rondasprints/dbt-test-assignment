@@ -14,7 +14,7 @@ clean-targets: ["target", "dbt_packages"]
 models:
   retail_challenge:
     staging:
-      +materialized: view
+      +materialized: table
       +schema: staging
     intermediate:
       +materialized: view

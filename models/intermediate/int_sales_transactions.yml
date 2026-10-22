@@ -25,3 +25,21 @@ models:
         description: Number of raw source rows carrying this transaction ID.
         tests:
           - not_null
+
+  - name: int_transaction_versions
+    description: >
+      One row for each persisted staging row with an explicit, deterministic
+      selected-versus-triage disposition before the event fact is built.
+    columns:
+      - name: source_row_fingerprint
+        tests:
+          - not_null
+      - name: source_version_rank
+        tests:
+          - not_null
+      - name: version_disposition
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['selected_for_fact', 'triage_duplicate_version']

@@ -2,7 +2,9 @@
 
 This contract is a target for the source team, not a claim that the current CSV
 already complies. Keep the raw landing file immutable; validate it and publish
-row/entity-level exceptions to `mart_data_quality_triage` for review.
+row/entity-level exceptions to `mart_data_quality_triage` for review. The current
+dbt staging model is a persisted DuckDB table rebuilt by replacement from the
+full file; it is idempotent on rerun, not an incremental ingestion ledger.
 
 ## Required event fields
 
@@ -10,10 +12,10 @@ row/entity-level exceptions to `mart_data_quality_triage` for review.
 |---|---|
 | `transaction_id` | Non-null business event identifier. If one transaction can contain multiple product lines, provide a stable `transaction_line_id`; do not reuse a header ID as a line key. |
 | `transaction_date` | Valid economic date in ISO `YYYY-MM-DD`, with timezone/date semantics documented. Do not substitute ingestion time. |
-| `quantity` | Signed integer in the declared selling-unit grain. Negative values require a return/adjustment reason and, where possible, the original transaction reference. |
+| `quantity` | Signed integer in an explicitly declared grain (packs or individual units). Negative values require a return/adjustment reason and, where possible, the original transaction reference. |
 | `unit_price` | Non-negative decimal in an explicitly declared currency and selling-unit grain. State whether discounts/tax are included. |
 | `product_id`, `store_id` | Non-null references to governed entities. Use an explicit, documented unknown code only when genuinely unavailable; do not use null and `99901` interchangeably. |
-| `pack_size` | Positive integer. Define whether quantity/price are per each or per pack and how every cost field relates to that unit. |
+| `pack_size` | Positive integer. Define whether quantity, price, and every cost field are per each or per pack and how to convert among grains. |
 | `standard_unit_cost`, `landed_unit_cost`, `unit_cost` | Decimal, currency and effective date required. Name and document each measure's grain (each vs pack), scope, and accounting meaning; do not send competing unlabeled bases. |
 | `source_system`, `ingested_at` | Required lineage. `ingested_at` is a UTC timestamp and never replaces economic date. |
 
@@ -33,6 +35,8 @@ row/entity-level exceptions to `mart_data_quality_triage` for review.
 - Deliver idempotently with a stable event/line key and an explicit upsert or
   correction policy. A repeated key is a version only when its event payload is
   unchanged; changed economic fields must be identified as corrections or new lines.
+- Publish an immutable file/batch ID and record-level lineage so a full-file dbt
+  replacement can be distinguished from incremental source delivery and audited.
 - Publish schema/version changes before rollout. Reject malformed types, impossible
   dates, non-positive pack size, missing event IDs, and invalid price/cost values
   with an accountable source owner and reason.
@@ -44,8 +48,11 @@ row/entity-level exceptions to `mart_data_quality_triage` for review.
 
 ## Current handling
 
-The dbt project retains source rows in staging, selects one version for the event
-fact, maps unknown keys to explicit dimension members, preserves returns, and
-materializes the current exception set for triage. The triage model is rebuilt from
-source data and must not be edited to record dispositions; use a governed ticket or
-append-only issue workflow for durable ownership/status.
+The dbt project persists all 509,480 typed source rows in staging and replaces
+that table on each build. A stable content fingerprint is unique in this extract;
+an automated test checks staged row count against the source on every run. The
+version audit selects 499,665 transaction IDs and retains 9,815 displaced
+versions in row-level triage. It also maps unknown keys to explicit dimension
+members and preserves returns. The triage model is rebuilt from source and must
+not be edited to record dispositions; use a governed ticket or append-only issue
+workflow for durable ownership/status.

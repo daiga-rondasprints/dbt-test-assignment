@@ -1,8 +1,28 @@
 version: 2
 
 models:
+  - name: dim_date
+    description: >
+      Complete calendar-day dimension spanning all calendar years represented
+      by transactions, supporting standard calendar drilldowns and date filters.
+    columns:
+      - name: date_key
+        tests:
+          - not_null
+          - unique
+      - name: date_day
+        tests:
+          - not_null
+          - unique
+      - name: calendar_year
+        tests:
+          - not_null
+
   - name: dim_product
-    description: Product dimension with one modal catalog/category profile per source product ID and an explicit Unknown member.
+    description: >
+      Product hierarchy is category -> product ID/name. Pack size is a packaging
+      attribute (not another hierarchy level); the current source has one observed
+      pack size per known product.
     columns:
       - name: product_key
         tests:
@@ -11,6 +31,8 @@ models:
       - name: product_name
         tests:
           - not_null
+      - name: pack_size
+        description: Units per pack as supplied; not used to redefine global revenue.
       - name: is_unknown
         tests:
           - not_null
@@ -64,6 +86,13 @@ models:
       - name: transaction_date
         tests:
           - not_null
+      - name: date_key
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_key
       - name: quantity
         tests:
           - not_null
@@ -112,7 +141,9 @@ models:
     description: >
       Annual store sales and gross profit. The two direct-cost scenarios show
       gross profit less the observed store cost interpreted as annual or monthly;
-      neither is labelled or presented as net profit.
+      neither is labelled or presented as net profit. Productivity measures
+      divide store financials by the modal store square footage; invalid area
+      values remain visible for investigation and produce null per-area metrics.
     columns:
       - name: store_key
         tests:
@@ -121,3 +152,26 @@ models:
               arguments:
                 to: ref('dim_store')
                 field: store_key
+
+  - name: mart_team_kpi_scorecard
+    description: >
+      Common metric formulae presented through CEO, Finance, Merchandising,
+      Store Operations and Sales Ops KPI views. Alternative cost bases are named
+      sensitivities, not competing definitions of global net sales.
+    columns:
+      - name: year
+        tests:
+          - not_null
+      - name: team_view
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['CEO', 'Finance', 'Merchandising', 'Store Operations', 'Sales Ops']
+      - name: metric_code
+        tests:
+          - not_null
+      - name: metric_value
+      - name: formula
+        tests:
+          - not_null

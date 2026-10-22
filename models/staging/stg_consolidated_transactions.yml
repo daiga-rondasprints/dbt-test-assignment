@@ -21,6 +21,7 @@ models:
         description: Deterministic hash of the typed source row; the upstream extract has no line ID.
         tests:
           - not_null
+          - unique
       - name: quantity
         description: Signed unit quantity; negative values are retained as returns or adjustments.
       - name: product_id
